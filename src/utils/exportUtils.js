@@ -6,45 +6,44 @@ export async function exportToImage(scrollEl, filename) {
   const tableEl = scrollEl.querySelector('table');
   if (!tableEl) return;
 
-  // ── 1. Kumpulkan semua elemen yang perlu diubah sementara ──────────────────
+  // ── 1. Clone tabel & taruh di luar layar ──────────────────────────────────
+  const clone = tableEl.cloneNode(true);
 
-  // Semua elemen dengan position sticky
-  const stickyEls = tableEl.querySelectorAll('.sticky-col');
-  // Semua elemen yang disembunyikan oleh media query HP
-  const hiddenEls = tableEl.querySelectorAll('.sticky-col-nik, .sticky-col-jabatan');
-
-  // Simpan style asli
-  const origScrollOverflow  = scrollEl.style.overflow;
-  const origScrollWidth     = scrollEl.style.width;
-  const origScrollMaxWidth  = scrollEl.style.maxWidth;
-  const origScrollMinWidth  = scrollEl.style.minWidth;
-
-  const stickyOrigPos = [];
-  stickyEls.forEach(el => {
-    stickyOrigPos.push({ el, position: el.style.position });
+  // Hapus sticky + tampilkan kolom yang disembunyikan media query HP
+  clone.querySelectorAll('.sticky-col').forEach(el => {
     el.style.position = 'static';
+    el.style.left     = 'auto';
+    el.style.zIndex   = 'auto';
+    el.style.boxShadow = 'none';
   });
-
-  const hiddenOrigDisplay = [];
-  hiddenEls.forEach(el => {
-    hiddenOrigDisplay.push({ el, display: el.style.display });
+  clone.querySelectorAll('.sticky-col-nik, .sticky-col-jabatan').forEach(el => {
     el.style.display = 'table-cell';
   });
 
-  // ── 2. Buka semua constraint overflow pada scroll wrapper ───────────────────
-  scrollEl.style.overflow  = 'visible';
-  scrollEl.style.width     = 'max-content';
-  scrollEl.style.maxWidth  = 'none';
-  scrollEl.style.minWidth  = 'none';
+  // Wrapper off-screen: posisi absolute agar tidak ikut scroll
+  const offscreen = document.createElement('div');
+  offscreen.style.cssText = [
+    'position:absolute',
+    'top:0',
+    'left:-99999px',
+    'width:max-content',
+    'background:#ffffff',
+    'z-index:-9999',
+    'pointer-events:none',
+    'opacity:1',
+  ].join(';');
+  offscreen.appendChild(clone);
+  document.body.appendChild(offscreen);
 
-  // Tunggu browser selesai re-layout
+  // Tunggu browser selesai layout
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  const fullWidth  = tableEl.offsetWidth;
-  const fullHeight = tableEl.offsetHeight;
+  const fullWidth  = clone.scrollWidth;
+  const fullHeight = clone.scrollHeight;
 
   try {
-    const canvas = await html2canvas(tableEl, {
+    // windowWidth 3000 → paksa html2canvas pakai desktop CSS (bypass media query HP)
+    const canvas = await html2canvas(offscreen, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
@@ -54,8 +53,9 @@ export async function exportToImage(scrollEl, filename) {
       y: 0,
       width:        fullWidth,
       height:       fullHeight,
-      windowWidth:  fullWidth,
+      windowWidth:  3000,
       windowHeight: fullHeight,
+      logging: false,
     });
 
     const link    = document.createElement('a');
@@ -63,18 +63,6 @@ export async function exportToImage(scrollEl, filename) {
     link.href     = canvas.toDataURL('image/png');
     link.click();
   } finally {
-    // ── 3. Kembalikan semua style ke aslinya ───────────────────────────────
-    scrollEl.style.overflow  = origScrollOverflow;
-    scrollEl.style.width     = origScrollWidth;
-    scrollEl.style.maxWidth  = origScrollMaxWidth;
-    scrollEl.style.minWidth  = origScrollMinWidth;
-
-    stickyOrigPos.forEach(({ el, position }) => {
-      el.style.position = position;
-    });
-
-    hiddenOrigDisplay.forEach(({ el, display }) => {
-      el.style.display = display;
-    });
+    document.body.removeChild(offscreen);
   }
 }
