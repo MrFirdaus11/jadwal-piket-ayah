@@ -2,60 +2,65 @@ import html2canvas from 'html2canvas';
 
 export async function exportToImage(scrollEl, filename) {
   if (!scrollEl) return;
-
   const tableEl = scrollEl.querySelector('table');
   if (!tableEl) return;
 
-  // ── 1. Clone tabel & taruh di luar layar ──────────────────────────────────
+  // ── 1. Clone tabel ─────────────────────────────────────────────────────────
   const clone = tableEl.cloneNode(true);
 
-  // Hapus sticky + tampilkan kolom yang disembunyikan media query HP
+  // Lepas sticky positioning (ganggu kalkulasi lebar)
   clone.querySelectorAll('.sticky-col').forEach(el => {
-    el.style.position = 'static';
-    el.style.left     = 'auto';
-    el.style.zIndex   = 'auto';
-    el.style.boxShadow = 'none';
+    el.style.setProperty('position',   'static',     'important');
+    el.style.setProperty('left',       'auto',        'important');
+    el.style.setProperty('z-index',    'auto',        'important');
+    el.style.setProperty('box-shadow', 'none',        'important');
   });
+
+  // Tampilkan kolom NIK & Jabatan yang disembunyikan di HP
   clone.querySelectorAll('.sticky-col-nik, .sticky-col-jabatan').forEach(el => {
-    el.style.display = 'table-cell';
+    el.style.setProperty('display', 'table-cell', 'important');
   });
 
-  // Wrapper off-screen: posisi absolute agar tidak ikut scroll
-  const offscreen = document.createElement('div');
-  offscreen.style.cssText = [
-    'position:absolute',
+  // ── 2. Wrapper di pojok kiri-atas layar (koordinat 0,0) ────────────────────
+  // opacity 0.001 = tidak terlihat tapi tetap di-render browser untuk layout
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = [
+    'position:fixed',
     'top:0',
-    'left:-99999px',
-    'width:max-content',
-    'background:#ffffff',
-    'z-index:-9999',
+    'left:0',
+    'opacity:0.001',
     'pointer-events:none',
-    'opacity:1',
+    'overflow:visible',
+    'background:#ffffff',
+    'z-index:-1',
+    'white-space:nowrap',
   ].join(';');
-  offscreen.appendChild(clone);
-  document.body.appendChild(offscreen);
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
 
-  // Tunggu browser selesai layout
+  // Tunggu dua frame agar browser selesai menghitung layout
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  const fullWidth  = clone.scrollWidth;
-  const fullHeight = clone.scrollHeight;
+  // Ukur lebar & tinggi PENUH tabel setelah layout selesai
+  const W = clone.scrollWidth;
+  const H = clone.scrollHeight;
 
   try {
-    // windowWidth 3000 → paksa html2canvas pakai desktop CSS (bypass media query HP)
-    const canvas = await html2canvas(offscreen, {
-      scale: 2,
-      useCORS: true,
+    const canvas = await html2canvas(clone, {
+      scale:        2,
+      useCORS:      true,
+      allowTaint:   true,
       backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      x: 0,
-      y: 0,
-      width:        fullWidth,
-      height:       fullHeight,
-      windowWidth:  3000,
-      windowHeight: fullHeight,
-      logging: false,
+      logging:      false,
+      scrollX:      0,
+      scrollY:      0,
+      x:            0,
+      y:            0,
+      width:        W,
+      height:       H,
+      // windowWidth lebih besar dari tabel → bypass semua @media (max-width: ...)
+      windowWidth:  W + 500,
+      windowHeight: H,
     });
 
     const link    = document.createElement('a');
@@ -63,6 +68,7 @@ export async function exportToImage(scrollEl, filename) {
     link.href     = canvas.toDataURL('image/png');
     link.click();
   } finally {
-    document.body.removeChild(offscreen);
+    // Selalu hapus clone dari DOM
+    document.body.removeChild(wrapper);
   }
 }
