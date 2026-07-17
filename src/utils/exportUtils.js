@@ -21,29 +21,25 @@ export async function exportToImage(scrollEl, filename) {
     el.style.setProperty('display', 'table-cell', 'important');
   });
 
-  // ── 2. Wrapper di pojok kiri-atas layar (koordinat 0,0) ────────────────────
-  // opacity 0.001 = tidak terlihat tapi tetap di-render browser untuk layout
+  // ── 2. Wrapper di pojok kiri-atas (tidak terlihat) ────────────────────────
   const wrapper = document.createElement('div');
   wrapper.style.cssText = [
     'position:fixed',
-    'top:0',
     'left:0',
-    'opacity:0.001',
+    'top:0',
+    'opacity:0',
     'pointer-events:none',
-    'overflow:visible',
     'background:#ffffff',
     'z-index:-1',
-    'white-space:nowrap',
+    'display:inline-block',
+    'width:max-content',
+    'height:max-content',
   ].join(';');
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
 
-  // Tunggu dua frame agar browser selesai menghitung layout
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-  // Ukur lebar & tinggi PENUH tabel setelah layout selesai
-  const W = clone.scrollWidth;
-  const H = clone.scrollHeight;
+  // Tunggu layout browser selesai (3 frame untuk memastikan)
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))));
 
   try {
     const canvas = await html2canvas(clone, {
@@ -56,11 +52,8 @@ export async function exportToImage(scrollEl, filename) {
       scrollY:      0,
       x:            0,
       y:            0,
-      width:        W,
-      height:       H,
-      // windowWidth lebih besar dari tabel → bypass semua @media (max-width: ...)
-      windowWidth:  W + 500,
-      windowHeight: H,
+      width:        clone.scrollWidth,
+      height:       clone.scrollHeight,
     });
 
     const link    = document.createElement('a');

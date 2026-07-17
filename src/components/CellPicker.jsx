@@ -3,16 +3,18 @@ import './CellPicker.css';
 
 export default function CellPicker({ codes, currentValue, position, onSelect, onClose }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
-        onClose();
+        onCloseRef.current();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+  }, []);
 
   // Adjust position to keep popup visible
   const style = {

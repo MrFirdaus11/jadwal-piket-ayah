@@ -7,7 +7,6 @@ export function useScheduleData(year, month) {
   
   const [schedule, setScheduleState] = useState({});
   const [redDates, setRedDatesState] = useState([]);
-  const [apiRedDates, setApiRedDates] = useState([]);
 
   // Load from storage when month/year changes
   useEffect(() => {
@@ -24,11 +23,8 @@ export function useScheduleData(year, month) {
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
         if (!cancelled && Array.isArray(data)) {
-          // data is array of { tanggal: "YYYY-MM-DD", keterangan: "..." }
           const dates = data.map(item => item.tanggal);
-          setApiRedDates(dates);
           
-          // Merge with existing: only add API dates that user hasn't manually removed
           // On first load for this month, seed red dates from API
           const stored = getRedDates(yearMonth);
           if (stored.length === 0 && dates.length > 0) {
@@ -84,7 +80,6 @@ export function useScheduleData(year, month) {
   return {
     schedule,
     redDates,
-    apiRedDates,
     setCellValue,
     getCellValue,
     toggleRedDate,
